@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-health-check
+  namespace: "mysql"
+spec:
+  selector:
+    matchLabels:
+      app: mysql-health-check
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mysql-health-check
+    spec:
+      tolerations:
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 10
+        - key: "node.kubernetes.io/not-ready"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 10
+      containers:
+      - name: mysql-health-check
+        image: registry2.agiliz.tech/mysql-health-check
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: healthdb
+          mountPath: /var/www/html/php/health-check/
+        resources:
+          requests:
+            memory: "100Mi"
+            cpu: "40m"
+          limits:
+            memory: "250Mi"
+            cpu: "250m"
+      imagePullSecrets:
+        - name: regcred5
+      volumes:
+      - name: healthdb
+        configMap:
+          defaultMode: 420
+          name: healthdb
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-health-check
+  namespace: "mysql"
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 31844
+    protocol: TCP
+    name: mysql-health-check
+  selector:
+    app: mysql-health-check
